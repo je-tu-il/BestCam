@@ -1,0 +1,48 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and export IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build Archive
+        run: |
+          xcodebuild clean archive \
+            -project BestCam.xcodeproj \
+            -scheme BestCam \
+            -configuration Release \
+            -archivePath $PWD/build/BestCam.xcarchive \
+            -sdk iphoneos \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export Unsigned IPA
+        run: |
+          # Création d'un IPA non signé à partir de l'archive
+          mkdir -p Payload
+          cp -r build/BestCam.xcarchive/Products/Applications/BestCam.app Payload/
+          zip -r BestCam.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BestCam-IPA
+          path: BestCam.ipa
