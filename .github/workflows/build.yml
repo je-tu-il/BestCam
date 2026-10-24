@@ -1,11 +1,15 @@
-name: Build iOS App
+name: Build & Release iOS IPA
 
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -13,16 +17,16 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install XcodeGen
+      - name: ⚙️ Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode Project
+      - name: 🏗️ Generate Xcode Project
         run: xcodegen generate
 
-      - name: Build Archive
+      - name: 🔨 Build Archive
         run: |
           xcodebuild clean archive \
             -project BestCam.xcodeproj \
@@ -34,15 +38,41 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Export Unsigned IPA
+      - name: 📦 Export Unsigned IPA
         run: |
-          # Création d'un IPA non signé à partir de l'archive
           mkdir -p Payload
           cp -r build/BestCam.xcarchive/Products/Applications/BestCam.app Payload/
           zip -r BestCam.ipa Payload
 
-      - name: Upload Artifact
+      - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BestCam-IPA
           path: BestCam.ipa
+
+      - name: 🏷️ Determine Tag
+        id: vars
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v1.0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🚀 Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: "BestCam ${{ steps.vars.outputs.tag }}"
+          body: |
+            ## 📸 BestCam iOS Release
+
+            Caméra intelligente iOS à déclenchement vocal natif :
+            - 📱 **`BestCam.ipa`** : Application iOS native prête pour le sideloading (iOS 17+).
+            - 🛠️ Compatible avec **AltStore**, **SideStore**, **Sideloadly** ou **TrollStore**.
+          files: BestCam.ipa
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
