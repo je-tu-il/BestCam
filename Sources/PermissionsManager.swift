@@ -1,27 +1,36 @@
+import Combine
 import Foundation
 import AVFoundation
 import Speech
 
 class PermissionsManager: ObservableObject {
-    @Published var allPermissionsGranted: Bool = false
+    @Published var cameraAuthorized: Bool = false
+    @Published private(set) var speechAuthorized = false
     
     func requestAllPermissions(completion: @escaping (Bool) -> Void) {
-        requestCameraPermission { cameraGranted in
-            guard cameraGranted else {
-                completion(false)
+        requestCameraPermission { granted in
+            guard granted else {
+                DispatchQueue.main.async {
+                    self.cameraAuthorized = false
+                    self.speechAuthorized = false
+                    completion(false)
+                }
                 return
             }
-            
-            self.requestMicrophonePermission { micGranted in
-                guard micGranted else {
-                    completion(false)
+            self.requestMicrophonePermission { microphone in
+                guard microphone else {
+                    DispatchQueue.main.async {
+                        self.cameraAuthorized = true
+                        self.speechAuthorized = false
+                        completion(true)
+                    }
                     return
                 }
-                
-                self.requestSpeechPermission { speechGranted in
+                self.requestSpeechPermission { speech in
                     DispatchQueue.main.async {
-                        self.allPermissionsGranted = speechGranted
-                        completion(speechGranted)
+                        self.cameraAuthorized = true
+                        self.speechAuthorized = speech
+                        completion(true)
                     }
                 }
             }

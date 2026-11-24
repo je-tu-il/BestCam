@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Speech
 import UIKit
@@ -14,14 +15,16 @@ class SpeechManager: ObservableObject, CameraAudioDelegate {
     }
     
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "fr-FR"))
+    private let requestLock = NSLock()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     
     // Pour éviter de déclencher plusieurs fois la même commande rapidement
+    private var recognitionID: UUID?
     private var lastCommandTime = Date.distantPast
     
     func startListening() {
-        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+        guard let recognizer = speechRecognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
             print("Speech recognizer not available for fr-FR")
             return
         }
@@ -29,13 +32,17 @@ class SpeechManager: ObservableObject, CameraAudioDelegate {
         // Stop ongoing tasks
         stopListening()
         
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest = recognitionRequest else { return }
+        let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        requestLock.lock()
+        self.recognitionRequest = recognitionRequest
+        requestLock.unlock()
         
         // Force offline recognition
         recognitionRequest.requiresOnDeviceRecognition = true
         recognitionRequest.shouldReportPartialResults = true
         
+        let recognitionID = UUID()
+        self.recognitionID = recognitionID
         recognitionTask = recognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
             
@@ -43,19 +50,15 @@ class SpeechManager: ObservableObject, CameraAudioDelegate {
                 let text = result.bestTranscription.formattedString.lowercased()
                 
                 DispatchQueue.main.async {
+                    guard self.recognitionID == recognitionID else { return }
                     self.recognizedText = text
                     self.processKeywords(in: text)
                 }
             }
             
-            if let error = error {
-                print("Recognition error: \(error.localizedDescription)")
-                self.stopListening()
-                // Relancer l'écoute si l'erreur n'est pas fatale (parfois nécessaire si le moteur s'arrête)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    if UIApplication.shared.applicationState == .active {
-                        self.startListening()
-                    }
+            if error != nil || result?.isFinal == true {
+                DispatchQueue.main.async {
+                    if self.recognitionID == recognitionID { self.stopListening() }
                 }
             }
         }
@@ -66,10 +69,14 @@ class SpeechManager: ObservableObject, CameraAudioDelegate {
     }
     
     func stopListening() {
+        recognitionID = nil
         recognitionTask?.cancel()
         recognitionTask = nil
-        recognitionRequest?.endAudio()
+        requestLock.lock()
+        let stoppedRequest = recognitionRequest
         recognitionRequest = nil
+        requestLock.unlock()
+        stoppedRequest?.endAudio()
         
         DispatchQueue.main.async {
             self.isListening = false
@@ -78,9 +85,9 @@ class SpeechManager: ObservableObject, CameraAudioDelegate {
     
     func didReceiveAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
         // Appelé depuis le thread audio de CameraManager
-        if let request = recognitionRequest {
-            request.appendAudioSampleBuffer(sampleBuffer)
-        }
+        requestLock.lock()
+        recognitionRequest?.appendAudioSampleBuffer(sampleBuffer)
+        requestLock.unlock()
     }
     
     private func processKeywords(in text: String) {

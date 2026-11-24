@@ -26,6 +26,8 @@
 	<string>BestCam a besoin d'accéder au microphone pour enregistrer le son des vidéos et pour la détection des mots-clés.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>BestCam utilise la reconnaissance vocale hors-ligne pour obéir à vos mots-clés ("photo", "début vidéo", etc.)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>BestCam ajoute à Photos les images et vidéos que vous capturez.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

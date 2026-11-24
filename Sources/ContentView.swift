@@ -10,7 +10,7 @@ struct ContentView: View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             
-            if permissionsManager.allPermissionsGranted {
+            if permissionsManager.cameraAuthorized {
                 if cameraManager.isSessionRunning {
                     CameraPreviewView(session: cameraManager.session)
                         .edgesIgnoringSafeArea(.all)
@@ -30,23 +30,39 @@ struct ContentView: View {
                             .lineLimit(1)
                             .padding(.horizontal)
                         
-                        HStack(spacing: 20) {
-                            Circle()
-                                .fill(cameraManager.isRecording ? Color.red : Color.white)
-                                .frame(width: 60, height: 60)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.black, lineWidth: 2)
-                                )
-                                .onTapGesture {
-                                    if cameraManager.isRecording {
-                                        cameraManager.stopRecording()
-                                    } else {
-                                        cameraManager.takePhoto() // Par défaut bouton physique pour la photo
-                                    }
-                                }
+                        if let status = cameraManager.statusMessage {
+                            Text(status).font(.footnote).foregroundStyle(.white)
                         }
-                        .padding(.bottom, 30)
+                        Button(speechManager.isListening ? "Couper l’écoute" : "Activer l’écoute") {
+                            if speechManager.isListening { speechManager.stopListening() }
+                            else if permissionsManager.speechAuthorized { speechManager.startListening() }
+                            else {
+                                permissionsManager.requestAllPermissions { _ in
+                                    if permissionsManager.speechAuthorized { speechManager.startListening() }
+                                }
+                            }
+                        }
+                        .buttonStyle(.bordered)
+
+                        HStack(spacing: 20) {
+                            Button {
+                                cameraManager.takePhoto()
+                            } label: {
+                                Label("Photo", systemImage: "camera")
+                            }
+                            .disabled(!cameraManager.isSessionRunning || cameraManager.isRecording)
+
+                            Button {
+                                if cameraManager.isRecording { cameraManager.stopRecording() }
+                                else { cameraManager.startRecording() }
+                            } label: {
+                                Label(cameraManager.isRecording ? "Arrêter" : "Vidéo",
+                                      systemImage: cameraManager.isRecording ? "stop.circle" : "record.circle")
+                            }
+                            .disabled(!cameraManager.isSessionRunning)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.bottom, 18)
                     }
                     .background(Color.black.opacity(0.6))
                     .cornerRadius(15)
@@ -57,19 +73,12 @@ struct ContentView: View {
                     Text("Permissions requises")
                         .font(.title)
                         .foregroundColor(.white)
-                    Text("Veuillez autoriser l'accès à la caméra, au microphone et à la reconnaissance vocale dans les réglages de votre appareil.")
+                    Text("Autorisez la caméra dans Réglages pour prendre des photos ou filmer.")
                         .multilineTextAlignment(.center)
                         .foregroundColor(.gray)
                         .padding()
                     Button("Réessayer") {
-                        permissionsManager.requestAllPermissions { success in
-                            if success {
-                                cameraManager.setupSession()
-                                speechManager.cameraManager = cameraManager
-                                cameraManager.startSession()
-                                speechManager.startListening()
-                            }
-                        }
+                        permissionsManager.requestAllPermissions { _ in }
                     }
                     .padding()
                     .background(Color.blue)

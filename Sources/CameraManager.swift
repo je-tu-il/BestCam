@@ -1,4 +1,6 @@
+import Combine
 import Foundation
+import Photos
 import AVFoundation
 import UIKit
 
@@ -11,6 +13,7 @@ class CameraManager: NSObject, ObservableObject {
     
     @Published var isSessionRunning = false
     @Published var isRecording = false
+    @Published var statusMessage: String?
     
     let photoOutput = AVCapturePhotoOutput()
     let movieOutput = AVCaptureMovieFileOutput()
@@ -23,9 +26,11 @@ class CameraManager: NSObject, ObservableObject {
     
     private var videoDeviceInput: AVCaptureDeviceInput?
     private var isUltraWide = false
+    private var configured = false
     
     func setupSession() {
         sessionQueue.async {
+            guard !self.configured else { return }
             self.session.beginConfiguration()
             
             // Set session preset
@@ -36,7 +41,8 @@ class CameraManager: NSObject, ObservableObject {
             
             // Add audio input
             do {
-                if let audioDevice = AVCaptureDevice.default(for: .audio) {
+                if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+                   let audioDevice = AVCaptureDevice.default(for: .audio) {
                     let audioInput = try AVCaptureDeviceInput(device: audioDevice)
                     if self.session.canAddInput(audioInput) {
                         self.session.addInput(audioInput)
@@ -61,6 +67,7 @@ class CameraManager: NSObject, ObservableObject {
             }
             
             self.session.commitConfiguration()
+            self.configured = self.videoDeviceInput != nil
         }
     }
     
@@ -80,6 +87,8 @@ class CameraManager: NSObject, ObservableObject {
                 self.session.addInput(videoInput)
                 self.videoDeviceInput = videoInput
                 self.isUltraWide = (deviceType == .builtInUltraWideCamera)
+            } else if let previous = self.videoDeviceInput, self.session.canAddInput(previous) {
+                self.session.addInput(previous)
             }
         } catch {
             print("Error adding video input: \(error)")
@@ -108,10 +117,11 @@ class CameraManager: NSObject, ObservableObject {
     
     func startSession() {
         sessionQueue.async {
-            if !self.session.isRunning {
+            if self.configured && !self.session.isRunning {
                 self.session.startRunning()
+                let started = self.session.isRunning
                 DispatchQueue.main.async {
-                    self.isSessionRunning = true
+                    self.isSessionRunning = started
                 }
             }
         }
@@ -130,6 +140,7 @@ class CameraManager: NSObject, ObservableObject {
     
     func takePhoto() {
         sessionQueue.async {
+            guard self.session.isRunning, self.photoOutput.connection(with: .video)?.isActive == true else { return }
             let settings = AVCapturePhotoSettings()
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
@@ -137,7 +148,8 @@ class CameraManager: NSObject, ObservableObject {
     
     func startRecording() {
         sessionQueue.async {
-            guard !self.movieOutput.isRecording else { return }
+            guard self.session.isRunning, !self.movieOutput.isRecording,
+                  self.movieOutput.connection(with: .video)?.isActive == true else { return }
             
             let tempDir = FileManager.default.temporaryDirectory
             let fileName = UUID().uuidString + ".mov"
@@ -170,27 +182,37 @@ extension CameraManager: AVCaptureAudioDataOutputSampleBufferDelegate {
 
 extension CameraManager: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation(), error == nil else {
-            print("Error capturing photo: \(String(describing: error))")
+        guard error == nil, let data = photo.fileDataRepresentation() else {
+            DispatchQueue.main.async { self.statusMessage = "La photo n’a pas pu être capturée." }
             return
         }
-        
-        // Save photo to gallery
-        if let image = UIImage(data: data) {
-            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-            print("Photo saved successfully")
+
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil)
+        } completionHandler: { saved, _ in
+            DispatchQueue.main.async {
+                self.statusMessage = saved ? "Photo ajoutée à Photos." : "Autorisez l’ajout à Photos dans Réglages."
+            }
         }
     }
 }
 
 extension CameraManager: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        if let error = error {
-            print("Recording error: \(error)")
-        } else {
-            // Save video to gallery
-            UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
-            print("Video saved successfully")
+        DispatchQueue.main.async { self.isRecording = false }
+        let recorded = error == nil || (error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true
+        guard recorded else {
+            try? FileManager.default.removeItem(at: outputFileURL)
+            DispatchQueue.main.async { self.statusMessage = "La vidéo n’a pas pu être capturée." }
+            return
+        }
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: outputFileURL, options: nil)
+        } completionHandler: { saved, _ in
+            if saved { try? FileManager.default.removeItem(at: outputFileURL) }
+            DispatchQueue.main.async {
+                self.statusMessage = saved ? "Vidéo ajoutée à Photos." : "La vidéo n’a pas pu être ajoutée à Photos."
+            }
         }
     }
 }
