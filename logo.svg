@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#070B14"/>
+        <stop offset="100%" stop-color="#111C33"/>
+      </linearGradient>
+      <radialGradient id="glow" cx="50%" cy="50%" r="48%">
+        <stop offset="0%" stop-color="#10B981" stop-opacity="0.38"/>
+        <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#34D399"/>
+        <stop offset="50%" stop-color="#06B6D4"/>
+        <stop offset="100%" stop-color="#3B82F6"/>
+      </linearGradient>
+      <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#1E293B"/>
+        <stop offset="100%" stop-color="#090D16"/>
+      </linearGradient>
+    </defs>
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <circle cx="512" cy="512" r="460" fill="url(#glow)"/>
+    <!-- Acoustic sound arcs -->
+    <path d="M 215 350 A 340 340 0 0 0 215 674" fill="none" stroke="url(#ring)" stroke-width="26" stroke-linecap="round" opacity="0.55"/>
+    <path d="M 145 280 A 430 430 0 0 0 145 744" fill="none" stroke="url(#ring)" stroke-width="20" stroke-linecap="round" opacity="0.3"/>
+    <path d="M 809 350 A 340 340 0 0 1 809 674" fill="none" stroke="url(#ring)" stroke-width="26" stroke-linecap="round" opacity="0.55"/>
+    <path d="M 879 280 A 430 430 0 0 1 879 744" fill="none" stroke="url(#ring)" stroke-width="20" stroke-linecap="round" opacity="0.3"/>
+    <!-- Camera body bezel -->
+    <circle cx="512" cy="512" r="275" fill="url(#glass)" stroke="url(#ring)" stroke-width="18"/>
+    <circle cx="512" cy="512" r="222" fill="#060A12" stroke="#1E293B" stroke-width="8"/>
+    <!-- Aperture blades -->
+    <g stroke="#34D399" stroke-width="6" fill="#0F172A" opacity="0.92">
+      <polygon points="512,320 620,415 545,455 430,395"/>
+      <polygon points="690,460 635,595 560,550 570,425"/>
+      <polygon points="575,688 430,660 455,575 590,565"/>
+      <polygon points="340,590 360,445 450,470 460,605"/>
+    </g>
+    <!-- Lens glass center -->
+    <circle cx="512" cy="512" r="96" fill="#020617" stroke="url(#ring)" stroke-width="10"/>
+    <circle cx="512" cy="512" r="56" fill="#0F172A"/>
+    <circle cx="484" cy="482" r="22" fill="#FFFFFF" opacity="0.65"/>
+    <circle cx="538" cy="538" r="10" fill="#34D399" opacity="0.8"/>
+    <!-- Voice mic LED -->
+    <circle cx="712" cy="312" r="20" fill="#10B981"/>
+    <circle cx="712" cy="312" r="9" fill="#ECFDF5"/>
+  </svg>
