@@ -6,7 +6,7 @@ struct ContentView: View {
     @EnvironmentObject var speechManager: SpeechManager
     @EnvironmentObject var permissionsManager: PermissionsManager
 
-    @State private var isUltraWide = false
+    @State private var videoMode = false
 
     var body: some View {
         ZStack {
@@ -63,26 +63,24 @@ struct ContentView: View {
 
             HStack(spacing: 6) {
                 Button {
-                    isUltraWide = false
                     cameraManager.switchToNormalWide()
                 } label: {
                     Text("1x")
                         .font(.caption.weight(.bold))
-                        .foregroundColor(!isUltraWide ? .black : .white)
+                        .foregroundColor(!cameraManager.isUltraWide ? .black : .white)
                         .frame(width: 34, height: 28)
-                        .background(!isUltraWide ? Color.mint : Color.white.opacity(0.12))
+                        .background(!cameraManager.isUltraWide ? Color.mint : Color.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
 
                 Button {
-                    isUltraWide = true
                     cameraManager.switchToUltraWide()
                 } label: {
                     Text("0.5x")
                         .font(.caption.weight(.bold))
-                        .foregroundColor(isUltraWide ? .black : .white)
+                        .foregroundColor(cameraManager.isUltraWide ? .black : .white)
                         .frame(width: 38, height: 28)
-                        .background(isUltraWide ? Color.mint : Color.white.opacity(0.12))
+                        .background(cameraManager.isUltraWide ? Color.mint : Color.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
             }
@@ -146,68 +144,39 @@ struct ContentView: View {
                     }
                 }
 
-                HStack(spacing: 28) {
-                    Button {
-                        cameraManager.takePhoto()
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "camera.fill")
-                                .font(.title3)
-                            Text("Photo")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(width: 68, height: 54)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    }
-                    .disabled(!cameraManager.isSessionRunning || cameraManager.isRecording)
-
-                    Button {
-                        if cameraManager.isRecording {
-                            cameraManager.stopRecording()
-                        } else {
-                            cameraManager.takePhoto()
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .stroke(Color.white, lineWidth: 4)
-                                .frame(width: 72, height: 72)
-                            if cameraManager.isRecording {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.red)
-                                    .frame(width: 28, height: 28)
-                            } else {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 58, height: 58)
-                            }
-                        }
-                    }
-                    .disabled(!cameraManager.isSessionRunning)
-                    .accessibilityLabel(cameraManager.isRecording ? "Arrêter la vidéo" : "Prendre une photo")
-
-                    Button {
-                        if cameraManager.isRecording {
-                            cameraManager.stopRecording()
-                        } else {
-                            cameraManager.startRecording()
-                        }
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: cameraManager.isRecording ? "stop.fill" : "video.fill")
-                                .font(.title3)
-                            Text(cameraManager.isRecording ? "Stop" : "Vidéo")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .foregroundColor(cameraManager.isRecording ? .white : .red)
-                        .frame(width: 68, height: 54)
-                        .background(cameraManager.isRecording ? Color.red : Color.red.opacity(0.18))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    }
-                    .disabled(!cameraManager.isSessionRunning)
+                Picker("Mode de capture", selection: $videoMode) {
+                    Text("Photo").tag(false)
+                    Text("Vidéo").tag(true)
                 }
+                .pickerStyle(.segmented)
+                .disabled(cameraManager.isRecording)
+
+                Button {
+                    if cameraManager.isRecording {
+                        cameraManager.stopRecording()
+                    } else if videoMode {
+                        cameraManager.startRecording()
+                    } else {
+                        cameraManager.takePhoto()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white, lineWidth: 4)
+                            .frame(width: 72, height: 72)
+                        if cameraManager.isRecording {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.red)
+                                .frame(width: 28, height: 28)
+                        } else {
+                            Circle()
+                                .fill(videoMode ? Color.red : Color.white)
+                                .frame(width: 58, height: 58)
+                        }
+                    }
+                }
+                .disabled(!cameraManager.isSessionRunning)
+                .accessibilityLabel(cameraManager.isRecording ? "Arrêter la vidéo" : videoMode ? "Enregistrer une vidéo" : "Prendre une photo")
                 .padding(.top, 4)
             }
             .padding(16)

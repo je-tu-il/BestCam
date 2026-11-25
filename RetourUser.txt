@@ -1,0 +1,19 @@
+# BestCam — tâches issues du retour utilisateur
+
+## Caméra et interface
+- [ ] Reproduire et corriger le blocage d’initialisation, puis vérifier le démarrage, les permissions et la reprise sur iPhone.
+- [ ] Simplifier l’écran de capture autour des modes Photo et Vidéo et d’un bouton unique pour activer ou désactiver les commandes vocales.
+
+## Commandes vocales
+- [ ] Déclencher une photo ou une vidéo et interpréter les formulations naturelles en français.
+- [ ] Lancer un décompte de 5 secondes à la voix, avec ou sans flash dont la cadence accélère.
+- [ ] Prendre une rafale.
+- [ ] Enregistrer au ralenti ou en accéléré.
+- [ ] Mettre la vidéo en pause et reprendre le même enregistrement.
+- [ ] Basculer vers le grand-angle et revenir à l’objectif standard.
+- [ ] Tester les commandes et les objectifs sur appareil compatible.
+
+Le démarrage est maintenant relancé après une configuration réussie sur nouvelle tentative. La validation sur iPhone reste à faire.
+
+## Modifications à valider
+Parcours Photo/Vidéo avec déclencheur unique et bouton vocal, commandes de retardateur avec flash progressif, rafale, changement d’objectif et pause/reprise à partir d’iOS 18 implémentées. Valider l’ensemble sur iPhone. Les modes ralenti et accéléré utilisent la cadence disponible de la caméra. La vitesse de lecture du fichier reste à vérifier.

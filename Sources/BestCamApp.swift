@@ -23,7 +23,6 @@ struct BestCamApp: App {
 
     private func updateCapture() {
         if scenePhase == .active && permissionsManager.cameraAuthorized {
-            cameraManager.setupSession()
             speechManager.cameraManager = cameraManager
             cameraManager.startSession()
         } else {
