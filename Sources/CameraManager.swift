@@ -30,6 +30,7 @@ class CameraManager: NSObject, ObservableObject {
     private var configured = false
     private var wantsSessionRunning = false
     private var setupGeneration = 0
+    private var videoRates: [URL: VideoRate] = [:]
 
     // MARK: - Setup with retry
 
@@ -208,7 +209,7 @@ class CameraManager: NSObject, ObservableObject {
                 // Switch to 240fps if available
                 self.applyFrameRate(240)
             } else if rate == .timelapse {
-                self.applyFrameRate(2)
+                self.applyFrameRate(30)
             } else {
                 self.applyFrameRate(30)
             }
@@ -217,6 +218,7 @@ class CameraManager: NSObject, ObservableObject {
             let fileName = UUID().uuidString + ".mov"
             let fileURL = tempDir.appendingPathComponent(fileName)
 
+            self.videoRates[fileURL] = rate
             self.movieOutput.startRecording(to: fileURL, recordingDelegate: self)
             DispatchQueue.main.async { self.isRecording = true; self.isPaused = false }
         }
@@ -326,19 +328,84 @@ extension CameraManager: AVCapturePhotoCaptureDelegate {
 
 extension CameraManager: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        DispatchQueue.main.async { self.isRecording = false }
+        sessionQueue.async {
+            let rate = self.videoRates.removeValue(forKey: outputFileURL) ?? .normal
+            self.finishVideo(at: outputFileURL, rate: rate, error: error)
+        }
+    }
+
+    private func finishVideo(at outputFileURL: URL, rate: VideoRate, error: Error?) {
+        DispatchQueue.main.async { self.isRecording = false; self.isPaused = false }
         let recorded = error == nil || (error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true
         guard recorded else {
             try? FileManager.default.removeItem(at: outputFileURL)
             DispatchQueue.main.async { self.statusMessage = "La vidéo n’a pas pu être capturée." }
             return
         }
+        guard rate != .normal else {
+            saveVideo(at: outputFileURL)
+            return
+        }
+
+        Task {
+            do {
+                let converted = try await exportAtSelectedRate(from: outputFileURL, rate: rate)
+                try? FileManager.default.removeItem(at: outputFileURL)
+                saveVideo(at: converted)
+            } catch {
+                saveVideo(at: outputFileURL, originalSpeed: true)
+            }
+        }
+    }
+
+    private func exportAtSelectedRate(from source: URL, rate: VideoRate) async throws -> URL {
+        let asset = AVURLAsset(url: source)
+        let composition = AVMutableComposition()
+        guard let sourceTrack = try await asset.loadTracks(withMediaType: .video).first,
+              let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let range = try await sourceTrack.load(.timeRange)
+        guard range.duration.seconds.isFinite, range.duration.seconds > 0 else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        try track.insertTimeRange(range, of: sourceTrack, at: .zero)
+        track.preferredTransform = try await sourceTrack.load(.preferredTransform)
+        let factor = rate == .slowMo ? 4.0 : 0.125
+        let duration = CMTimeMultiplyByFloat64(range.duration, multiplier: factor)
+        composition.scaleTimeRange(CMTimeRange(start: .zero, duration: range.duration), toDuration: duration)
+        guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+        if #available(iOS 18.0, *) {
+            do {
+                try await exporter.export(to: destination, as: .mov)
+            } catch {
+                try? FileManager.default.removeItem(at: destination)
+                throw error
+            }
+        } else {
+            exporter.outputURL = destination
+            exporter.outputFileType = .mov
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                exporter.exportAsynchronously { continuation.resume() }
+            }
+            guard exporter.status == .completed else {
+                try? FileManager.default.removeItem(at: destination)
+                throw exporter.error ?? CocoaError(.fileWriteUnknown)
+            }
+        }
+        return destination
+    }
+
+    private func saveVideo(at outputFileURL: URL, originalSpeed: Bool = false) {
         PHPhotoLibrary.shared().performChanges {
             PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: outputFileURL, options: nil)
         } completionHandler: { saved, _ in
             if saved { try? FileManager.default.removeItem(at: outputFileURL) }
             DispatchQueue.main.async {
-                self.statusMessage = saved ? "Vidéo ajoutée à Photos." : "La vidéo n’a pas pu être ajoutée à Photos."
+                self.statusMessage = saved && originalSpeed ? "Vidéo originale ajoutée. Conversion indisponible." : saved ? "Vidéo ajoutée à Photos." : "La vidéo n’a pas pu être ajoutée à Photos."
             }
         }
     }
