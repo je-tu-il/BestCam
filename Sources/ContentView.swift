@@ -69,7 +69,7 @@ struct ContentView: View {
                         .font(.caption.weight(.bold))
                         .foregroundColor(!cameraManager.isUltraWide ? .black : .white)
                         .frame(width: 34, height: 28)
-                        .background(!cameraManager.isUltraWide ? Color.mint : Color.white.opacity(0.12))
+                        .background(!cameraManager.isUltraWide ? Color(red: 0.81, green: 0.83, blue: 0.67) : Color.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
 
@@ -80,7 +80,7 @@ struct ContentView: View {
                         .font(.caption.weight(.bold))
                         .foregroundColor(cameraManager.isUltraWide ? .black : .white)
                         .frame(width: 38, height: 28)
-                        .background(cameraManager.isUltraWide ? Color.mint : Color.white.opacity(0.12))
+                        .background(cameraManager.isUltraWide ? Color(red: 0.81, green: 0.83, blue: 0.67) : Color.white.opacity(0.12))
                         .clipShape(Capsule())
                 }
             }
@@ -99,7 +99,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(Color.mint.opacity(0.24))
+                    .background(Color(red: 0.81, green: 0.83, blue: 0.67).opacity(0.24))
                     .clipShape(Capsule())
             }
 
